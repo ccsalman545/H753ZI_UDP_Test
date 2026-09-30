@@ -77,4 +77,73 @@ void HAL_MspInit(void)
 
 /* USER CODE BEGIN 1 */
 
+/**
+  * @brief  ETH MSP initialisation: RMII pins, clocks and peripheral reset.
+  *
+  *         Called by HAL_ETH_Init() from low_level_init() in ethernetif.c.
+  *         Pin map is the RMII one in H753ZI_UDP_Test.ioc.
+  *
+  *         No NVIC interrupt is configured on purpose: ethernetif.c uses
+  *         HAL_ETH_Start() / HAL_ETH_ReadData() (polling), which fits the
+  *         NO_SYS = 1 build in lwipopts.h -- everything runs from the main
+  *         loop, so no locking is needed.
+  *
+  * @param  heth pointer to the ETH handle
+  */
+void HAL_ETH_MspInit(ETH_HandleTypeDef *heth)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  if (heth->Instance == ETH)
+  {
+    /* Peripheral clocks. SYSCFG is enabled by HAL_ETH_Init() itself, which
+       needs it to select the RMII interface. */
+    __HAL_RCC_ETH1MAC_CLK_ENABLE();
+    __HAL_RCC_ETH1TX_CLK_ENABLE();
+    __HAL_RCC_ETH1RX_CLK_ENABLE();
+
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+
+    /*
+     * ETH RMII pins:
+     *   PA1  REF_CLK    PA2  MDIO       PA7  CRS_DV
+     *   PB11 TX_EN      PB12 TXD0       PB13 TXD1
+     *   PC1  MDC        PC4  RXD0       PC5  RXD1
+     */
+    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull      = GPIO_NOPULL;
+    GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF11_ETH;
+
+    GPIO_InitStruct.Pin = GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_7;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = GPIO_PIN_11 | GPIO_PIN_12 | GPIO_PIN_13;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = GPIO_PIN_1 | GPIO_PIN_4 | GPIO_PIN_5;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+  }
+}
+
+/**
+  * @brief  ETH MSP de-initialisation, the inverse of HAL_ETH_MspInit().
+  * @param  heth pointer to the ETH handle
+  */
+void HAL_ETH_MspDeInit(ETH_HandleTypeDef *heth)
+{
+  if (heth->Instance == ETH)
+  {
+    __HAL_RCC_ETH1MAC_CLK_DISABLE();
+    __HAL_RCC_ETH1TX_CLK_DISABLE();
+    __HAL_RCC_ETH1RX_CLK_DISABLE();
+
+    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_7);
+    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_11 | GPIO_PIN_12 | GPIO_PIN_13);
+    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_1 | GPIO_PIN_4 | GPIO_PIN_5);
+  }
+}
+
 /* USER CODE END 1 */

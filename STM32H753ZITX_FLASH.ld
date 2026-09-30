@@ -49,6 +49,16 @@ MEMORY
   RAM_D2 (xrw)   : ORIGIN = 0x30000000, LENGTH = 288K
   RAM_D3 (xrw)   : ORIGIN = 0x38000000, LENGTH = 64K
   ITCMRAM (xrw)  : ORIGIN = 0x00000000, LENGTH = 64K
+
+  /*
+   * Ethernet DMA area: Rx/Tx descriptors and the Rx buffer pool.
+   *
+   * Kept as its own region, carved out of the bottom of RAM_D2, so the linker
+   * raises "section will not fit in region" if the driver ever outgrows it
+   * instead of silently running into the LwIP heap, which lwipopts.h pins at
+   * LWIP_RAM_HEAP_POINTER = 0x30004000.
+   */
+  ETH_RAM_D2 (xrw) : ORIGIN = 0x30000000, LENGTH = 16K
 }
 
 /* Define output sections */
@@ -154,6 +164,35 @@ SECTIONS
     _ebss = .;         /* define a global symbol at bss end */
     __bss_end__ = _ebss;
   } >RAM_D1
+
+  /*
+   * Ethernet DMA descriptors and buffers, in domain D2 SRAM.
+   *
+   * ethernetif.c tags these arrays with .RxDecripSection / .TxDecripSection /
+   * .Rx_PoolSection. They must not live in DTCMRAM or AXI SRAM: the ETH DMA is
+   * an AHB master in domain D2 and cannot reach either. MPU_Config() in main.c
+   * marks this range non-cacheable so the DMA and the CPU agree on contents.
+   */
+  .RxDecripSection (NOLOAD) :
+  {
+    . = ALIGN(4);
+    *(.RxDecripSection)
+    . = ALIGN(4);
+  } >ETH_RAM_D2
+
+  .TxDecripSection (NOLOAD) :
+  {
+    . = ALIGN(4);
+    *(.TxDecripSection)
+    . = ALIGN(4);
+  } >ETH_RAM_D2
+
+  .Rx_PoolSection (NOLOAD) :
+  {
+    . = ALIGN(32);
+    *(.Rx_PoolSection)
+    . = ALIGN(32);
+  } >ETH_RAM_D2
 
   /* User_heap_stack section, used to check that there is enough RAM left */
   ._user_heap_stack :
